@@ -13,6 +13,9 @@ scp:
 ssh:
     ssh -i .\key\Key_1.pem ubuntu@ec2-54-146-91-178.compute-1.amazonaws.com
 
+slice:
+    slic3r cube.stl --output cube.gcode
+
 """
 
 from time import sleep
@@ -37,8 +40,12 @@ instance_id = ['i-0dc8a2dbfad73a683']
 
 cUser       = 'ubuntu'
 cKey        = './key/Key_1.pem'
-localpath   = './Baby_Yoda_v2.2.stl'
-remotepath  = '/home/ubuntu/yoda.stl'
+
+u_lPath   = './test/cube.stl'
+d_lPath   = './test/cube.gcode'
+
+u_rPath  = '/home/ubuntu/temp.stl'
+d_rPath  = '/home/ubuntu/temp.gcode'
 
 #-------------------------------------------------------------------------------
 #                                   MAIN
@@ -50,39 +57,74 @@ def main():
     print( 'Number of arguments:', len(sys.argv), 'arguments.' )
     print( 'Argument List:', str(sys.argv) )
 
-    #printcmd( getinstancesstate() )
+    # First State Check
+    if( getinstancesstate() == 80 ):
+        printcmd("Start instance...")
+        startinstance()
+    elif(getinstancesstate() == 16):
+        printcmd("Instance already running...")
+    else:
+        printcmd("Wait for instance...")
+        while True:
+            sleep(2)
+            if(getinstancesstate() == 16 or getinstancesstate() == 80):
+                if(getinstancesstate() == 80):
+                    startinstance()
+                break
 
-    #sleep(2)
+    # Wait for instance start
+    while True:
+        sleep(3)
+        if(getinstancesstate() == 16):
+            printcmd("Wait for SSH server...")
+            sleep(20)
+            break
 
-    #startinstance()
+    # Get instance DNS
+    server = getinstancesDNS()
+    printcmd(server)
 
-    #sleep(15)
+    if( getinstancesstate() == 16 ):
+        # SCP upload:
+        printcmd("Upload file...")
+        putSCP(server , u_lPath, u_rPath)
+        printcmd("File upload complete!")
 
-    printcmd( getinstancesstate() )
-    startSSH( getinstancesDNS() )
+        # SSH command:
+        command = 'slic3r temp.stl --output temp.gcode'
+        printcmd("Start slice process...")
+        makeSSH(server, command)
+        printcmd("Slice process complete!")
 
-    sleep(5)
+        # SCP download:
+        printcmd("Download GCODE...")
+        getSCP(server, d_lPath, d_rPath)
+        printcmd("GCODE download complete! File Path: " + d_lPath)
 
-    stopinstance()
+        # Stop instance
+        printcmd("Stop instance...")
+        stopinstance()
+    else:
+        printcmd("Error! Instance is stopped!")
 
-    sleep(2)
 
-    printcmd( getinstancesstate() )
 #-------------------------------------------------------------------------------
 #                                   FUNCTIONS
 #-------------------------------------------------------------------------------
 
+#==================================AWS==================================
+
 def startinstance():
     try:
         response = ec2.instances.filter(InstanceIds=instance_id).start()
-        printcmd(response)
+        #printcmd(response)
     except ClientError as e:
         printcmd(e)
 
 def stopinstance():
     try:
         response = ec2.instances.filter(InstanceIds=instance_id).stop()
-        printcmd(response)
+        #printcmd(response)
     except ClientError as e:
         printcmd(e)
 
@@ -96,18 +138,37 @@ def getinstancesDNS():
     for instance in instances:
         return(instance.public_dns_name)
 
-def startSSH(server):
+
+#==================================SCP==================================
+
+def putSCP(server, lPath, rPath):
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh.connect(server, username=cUser, key_filename=cKey )
     sftp = ssh.open_sftp()
-    sftp.put(localpath, remotepath)
+    sftp.put(lPath, rPath)
     sftp.close()
     ssh.close()
 
+def getSCP(server, lPath, rPath):
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.connect(server, username=cUser, key_filename=cKey )
+    sftp = ssh.open_sftp()
+    sftp.get(rPath,lPath)
+    sftp.close()
+    ssh.close()
 
+#==================================SSH==================================
 
-
+def makeSSH(server, command):
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.connect(server, username=cUser, key_filename=cKey )
+    stdin, stdout, stderr = ssh.exec_command(command)
+    lines = stdout.readlines()
+    printcmd(str(lines))
+    ssh.close()
 
 
 
