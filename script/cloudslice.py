@@ -25,14 +25,12 @@ import boto3
 from botocore.exceptions import ClientError
 import os
 import paramiko
-
-
+import logging
 
 
 #-------------------------------------------------------------------------------
 #                                   CONFIG
 #-------------------------------------------------------------------------------
-
 
 ec2 = boto3.resource('ec2')
 
@@ -41,11 +39,28 @@ instance_id = ['i-0dc8a2dbfad73a683']
 cUser       = 'ubuntu'
 cKey        = './key/Key_1.pem'
 
-u_lPath   = './test/cube.stl'
-d_lPath   = './test/cube.gcode'
+u_lPath   = ''
+d_lPath   = ''
 
 u_rPath  = '/home/ubuntu/temp.stl'
 d_rPath  = '/home/ubuntu/temp.gcode'
+
+cmddict = {
+  "Layer height"    : "--layer-height",
+  "Temperature"     : "--temperature",
+  "Bed temperature" : "--bed-temperature",
+}
+
+cmdlist = list()
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("debug.log"),
+        logging.StreamHandler()
+    ]
+)
 
 #-------------------------------------------------------------------------------
 #                                   MAIN
@@ -54,17 +69,16 @@ d_rPath  = '/home/ubuntu/temp.gcode'
 def main():
     header()
 
-    print( 'Number of arguments:', len(sys.argv), 'arguments.' )
-    print( 'Argument List:', str(sys.argv) )
+    startwizard()
 
     # First State Check
     if( getinstancesstate() == 80 ):
-        printcmd("Start instance...")
+        logging.info("Start instance...")
         startinstance()
     elif(getinstancesstate() == 16):
-        printcmd("Instance already running...")
+        logging.info("Instance already running...")
     else:
-        printcmd("Wait for instance...")
+        logging.info("Wait for instance...")
         while True:
             sleep(2)
             if(getinstancesstate() == 16 or getinstancesstate() == 80):
@@ -76,37 +90,65 @@ def main():
     while True:
         sleep(3)
         if(getinstancesstate() == 16):
-            printcmd("Wait for SSH server...")
+            logging.info("Wait for SSH server...")
             sleep(20)
             break
 
     # Get instance DNS
     server = getinstancesDNS()
-    printcmd(server)
+    logging.info(server)
 
     if( getinstancesstate() == 16 ):
         # SCP upload:
-        printcmd("Upload file...")
+        logging.info("Upload file...")
         putSCP(server , u_lPath, u_rPath)
-        printcmd("File upload complete!")
+        logging.info("File upload complete!")
 
         # SSH command:
-        command = 'slic3r temp.stl --output temp.gcode'
-        printcmd("Start slice process...")
+        command = buildcommand()
+        logging.info("Start slice process...")
         makeSSH(server, command)
-        printcmd("Slice process complete!")
+        logging.info("Slice process complete!")
 
         # SCP download:
-        printcmd("Download GCODE...")
+        logging.info("Download GCODE...")
         getSCP(server, d_lPath, d_rPath)
-        printcmd("GCODE download complete! File Path: " + d_lPath)
+        logging.info("GCODE download complete! File Path: " + d_lPath)
 
         # Stop instance
-        printcmd("Stop instance...")
+        logging.info("Stop instance...")
         stopinstance()
     else:
-        printcmd("Error! Instance is stopped!")
+        logging.error("Error! Instance is stopped!")
 
+#-------------------------------------------------------------------------------
+#                                   WIZARD
+#-------------------------------------------------------------------------------
+
+def startwizard():
+    logging.info("Starting WIZARD!")
+    print(">>> File parameters")
+    u_lPath   = input("   Path input file (path/filename.stl): ")
+    d_lPath   = input("   Path output file (path/filename.gcode): ")
+
+    print("\n>>> Print parameters")
+    for key, item in cmddict.items():
+        value = input("   " + key + ": ")
+        cmdlist.append( item + " " + value )
+
+    print()
+
+    # TEST TODO: remove
+    command = buildcommand()
+    logging.debug(command)
+    exit()
+    #===================================
+
+def buildcommand():
+    command = 'slic3r ' + u_rPath + ' --output ' + d_rPath
+    for value in cmdlist:
+        command = command + " " + value
+    return command
 
 #-------------------------------------------------------------------------------
 #                                   FUNCTIONS
@@ -117,16 +159,14 @@ def main():
 def startinstance():
     try:
         response = ec2.instances.filter(InstanceIds=instance_id).start()
-        #printcmd(response)
     except ClientError as e:
-        printcmd(e)
+        logging.error(e)
 
 def stopinstance():
     try:
         response = ec2.instances.filter(InstanceIds=instance_id).stop()
-        #printcmd(response)
     except ClientError as e:
-        printcmd(e)
+        logging.error(e)
 
 def getinstancesstate():
     instances = ec2.instances.filter(InstanceIds=instance_id)
@@ -167,7 +207,7 @@ def makeSSH(server, command):
     ssh.connect(server, username=cUser, key_filename=cKey )
     stdin, stdout, stderr = ssh.exec_command(command)
     lines = stdout.readlines()
-    printcmd(str(lines))
+    logging.debug(str(lines))
     ssh.close()
 
 
@@ -177,7 +217,6 @@ def makeSSH(server, command):
 #-------------------------------------------------------------------------------
 #                              PRINT-INFOS
 #-------------------------------------------------------------------------------
-
 
 def header():
 
@@ -189,13 +228,6 @@ def header():
         print(" \_____|_|\___/ \__,_|\__,_|_____/|_|_|\___\___| ")
         print("             Created by Jonas R. & Kevin L.      ")
         print("")
-
-def printcmd(s):
-    dateTimeObj = datetime.now()
-    timestampStr = dateTimeObj.strftime("[%b %d %y %H:%M:%S]")
-    print(f"{timestampStr} {s}" )
-
-
 
 #-------------------------------------------------------------------------------
 #                              START
