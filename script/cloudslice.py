@@ -46,9 +46,16 @@ u_rPath  = '/home/ubuntu/temp.stl'
 d_rPath  = '/home/ubuntu/temp.gcode'
 
 cmddict = {
-  "Layer height"    : "--layer-height",
-  "Temperature"     : "--temperature",
-  "Bed temperature" : "--bed-temperature",
+  "Layer height ( 0.2 - 1 )"        : "--layer-height",
+  "Temperature ( 100-250 )"         : "--temperature",
+  "Bed temperature ( 0-100 )"       : "--bed-temperature",
+  "Cooling ( true/false )"          : "--cooling",
+  "Support ( true/false )"          : "--support-material",
+  "Fill Density ( 0-100 )"          : "--fill-density",
+  "Filament Diameter ( 1.75/3 )"    : "--filament-diameter",
+  "Nozzle Diameter ( 0.4-2 )"       : "--nozzle-diameter",
+  "Retract Length ( 0-10 )"         : "--retract-length",
+  "Scale  ( 1 = orginalsize )"      : "--scale"
 }
 
 cmdlist = list()
@@ -128,13 +135,23 @@ def main():
 def startwizard():
     logging.info("Starting WIZARD!")
     print(">>> File parameters")
-    u_lPath   = input("   Path input file (path/filename.stl): ")
-    d_lPath   = input("   Path output file (path/filename.gcode): ")
+
+    while(True):
+        u_lPath   = input("   Path input file (path/filename.stl): ")
+        if( os.path.isfile(u_lPath) ):
+            break
+        else:
+            print("File " + u_lPath + " doesnt exist!")
+            
+    d_lPath = input("   Path output file (path/filename.gcode): ")
 
     print("\n>>> Print parameters")
     for key, item in cmddict.items():
         value = input("   " + key + ": ")
-        cmdlist.append( item + " " + value )
+        if(value.lower() in "true"):
+            cmdlist.append( item )
+        elif(value.lower() not in "false"):
+            cmdlist.append( item + " " + value )
 
     print()
 
