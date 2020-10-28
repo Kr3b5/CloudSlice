@@ -8,10 +8,10 @@ States:
     80 : stopped
 
 scp:
-    scp -i .\key\Key_1.pem Baby_Yoda_v2.2.stl ubuntu@ec2-54-146-91-178.compute-1.amazonaws.com:/home/ubuntu/yoda.stl
+    scp -i .\key\Key_1.pem Baby_Yoda_v2.2.stl ubuntu@[instancedns]:/home/ubuntu/yoda.stl
 
 ssh:
-    ssh -i .\key\Key_1.pem ubuntu@ec2-54-146-91-178.compute-1.amazonaws.com
+    ssh -i .\key\Key_1.pem ubuntu@[instancedns]
 
 slice:
     slic3r cube.stl --output cube.gcode
@@ -39,29 +39,26 @@ instance_id = ['i-0dc8a2dbfad73a683']
 cUser       = 'ubuntu'
 cKey        = './key/Key_1.pem'
 
-u_lPath   = ''
-d_lPath   = ''
-
 u_rPath  = '/home/ubuntu/temp.stl'
 d_rPath  = '/home/ubuntu/temp.gcode'
 
 cmddict = {
-  "Layer height ( 0.2 - 1 )"        : "--layer-height",
-  "Temperature ( 100-250 )"         : "--temperature",
-  "Bed temperature ( 0-100 )"       : "--bed-temperature",
-  "Cooling ( true/false )"          : "--cooling",
-  "Support ( true/false )"          : "--support-material",
-  "Fill Density ( 0-100 )"          : "--fill-density",
-  "Filament Diameter ( 1.75/3 )"    : "--filament-diameter",
-  "Nozzle Diameter ( 0.4-2 )"       : "--nozzle-diameter",
-  "Retract Length ( 0-10 )"         : "--retract-length",
-  "Scale  ( 1 = orginalsize )"      : "--scale"
+  "> Layer height ( 0.2 - 1 )     " : "--layer-height",
+  "> Temperature ( 100-250 )      " : "--temperature",
+  "> Bed temperature ( 0-100 )    " : "--bed-temperature",
+  "> Cooling ( true/false )       " : "--cooling",
+  "> Support ( true/false )       " : "--support-material",
+  "> Fill Density ( 0-100 )       " : "--fill-density",
+  "> Filament Diameter ( 1.75/3 ) " : "--filament-diameter",
+  "> Nozzle Diameter ( 0.4-2 )    " : "--nozzle-diameter",
+  "> Retract Length ( 0-10 )      " : "--retract-length",
+  "> Scale  ( 1 = orginalsize )   " : "--scale"
 }
 
 cmdlist = list()
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.FileHandler("debug.log"),
@@ -78,12 +75,15 @@ def main():
 
     startwizard()
 
+    stime_ssh = 20
+
     # First State Check
     if( getinstancesstate() == 80 ):
         logging.info("Start instance...")
         startinstance()
     elif(getinstancesstate() == 16):
         logging.info("Instance already running...")
+        stime_ssh = 5
     else:
         logging.info("Wait for instance...")
         while True:
@@ -98,7 +98,7 @@ def main():
         sleep(3)
         if(getinstancesstate() == 16):
             logging.info("Wait for SSH server...")
-            sleep(20)
+            sleep(stime_ssh)
             break
 
     # Get instance DNS
@@ -133,8 +133,12 @@ def main():
 #-------------------------------------------------------------------------------
 
 def startwizard():
+
+    global u_lPath
+    global d_lPath
+
     logging.info("Starting WIZARD!")
-    print(">>> File parameters")
+    print(">>> File parameters (false=default)")
 
     while(True):
         u_lPath   = input("   Path input file (path/filename.stl): ")
@@ -142,7 +146,7 @@ def startwizard():
             break
         else:
             print("File " + u_lPath + " doesnt exist!")
-            
+
     d_lPath = input("   Path output file (path/filename.gcode): ")
 
     print("\n>>> Print parameters")
@@ -154,12 +158,6 @@ def startwizard():
             cmdlist.append( item + " " + value )
 
     print()
-
-    # TEST TODO: remove
-    command = buildcommand()
-    logging.debug(command)
-    exit()
-    #===================================
 
 def buildcommand():
     command = 'slic3r ' + u_rPath + ' --output ' + d_rPath
