@@ -7,9 +7,23 @@
 ## Version: 1.0.0
 
 ##################################################
+                STARTING GUIDE
+##################################################
+
+1. init EC2 instance
+2. install slic3r
+    > sudo apt-get install slic3r
+3. configurate the script (CONFIG section)
+    > instance_id = Instnce ID
+    > cUser = Username
+    > cKey = Private Key
+    > u_rPath = AWS upload location (STL)
+    > d_rPath = AWS download location (GCODE)
+
+##################################################
                 DEV INFORMATION
 ##################################################
-States:
+AWS States:
     0 : pending
     16 : running
     32 : shutting-down
@@ -67,6 +81,10 @@ cmddict = {
   "> Retract Length ( 0-10 )      " : "--retract-length",
   "> Scale  ( 1 = orginalsize )   " : "--scale"
 }
+
+#-------------------------------------------------------------------------------
+#                                   GLOBAL
+#-------------------------------------------------------------------------------
 
 # List for commands
 cmdlist = list()
