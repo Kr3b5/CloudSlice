@@ -1,4 +1,14 @@
 """
+##################################################
+                SCRIPT INFORMATION
+##################################################
+## Author: Kevin Lempert, Jonas Renz
+## Copyright: Copyright 2020, CloudSlice
+## Version: 1.0.0
+
+##################################################
+                DEV INFORMATION
+##################################################
 States:
     0 : pending
     16 : running
@@ -8,14 +18,13 @@ States:
     80 : stopped
 
 scp:
-    scp -i .\key\Key_1.pem Baby_Yoda_v2.2.stl ubuntu@[instancedns]:/home/ubuntu/yoda.stl
+    scp -i .\key\Key_1.pem file.stl ubuntu@[instancedns]:/home/ubuntu/file.stl
 
 ssh:
     ssh -i .\key\Key_1.pem ubuntu@[instancedns]
 
 slice:
-    slic3r cube.stl --output cube.gcode
-
+    slic3r file.stl --output file.gcode [options]
 """
 
 from time import sleep
@@ -32,16 +41,20 @@ import logging
 #                                   CONFIG
 #-------------------------------------------------------------------------------
 
-ec2 = boto3.resource('ec2')
-
+# AWS instance
 instance_id = ['i-0dc8a2dbfad73a683']
 
+# Credentials
 cUser       = 'ubuntu'
 cKey        = './key/Key_1.pem'
 
+# upload/download Path AWS
 u_rPath  = '/home/ubuntu/temp.stl'
 d_rPath  = '/home/ubuntu/temp.gcode'
 
+# Print parameter list for wizard
+# add new parameters here
+# Input text wizard : cmd slic3r
 cmddict = {
   "> Layer height ( 0.2 - 1 )     " : "--layer-height",
   "> Temperature ( 100-250 )      " : "--temperature",
@@ -55,8 +68,13 @@ cmddict = {
   "> Scale  ( 1 = orginalsize )   " : "--scale"
 }
 
+# List for commands
 cmdlist = list()
 
+# init boto3
+ec2 = boto3.resource('ec2')
+
+# Logging Configuration
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -70,7 +88,9 @@ logging.basicConfig(
 #                                   MAIN
 #-------------------------------------------------------------------------------
 
+# main function
 def main():
+
     header()
 
     startwizard()
@@ -132,6 +152,7 @@ def main():
 #                                   WIZARD
 #-------------------------------------------------------------------------------
 
+# wizard for print parameters
 def startwizard():
 
     global u_lPath
@@ -145,7 +166,7 @@ def startwizard():
         if( os.path.isfile(u_lPath) ):
             break
         else:
-            print("File " + u_lPath + " doesnt exist!")
+            logging.error("File " + u_lPath + " doesnt exist!")
 
     d_lPath = input("   Path output file (path/filename.gcode): ")
 
@@ -159,6 +180,7 @@ def startwizard():
 
     print()
 
+# build slic3r command
 def buildcommand():
     command = 'slic3r ' + u_rPath + ' --output ' + d_rPath
     for value in cmdlist:
@@ -171,23 +193,27 @@ def buildcommand():
 
 #==================================AWS==================================
 
+# start instance
 def startinstance():
     try:
         response = ec2.instances.filter(InstanceIds=instance_id).start()
     except ClientError as e:
         logging.error(e)
 
+# stop instance
 def stopinstance():
     try:
         response = ec2.instances.filter(InstanceIds=instance_id).stop()
     except ClientError as e:
         logging.error(e)
 
+# get instance state
 def getinstancesstate():
     instances = ec2.instances.filter(InstanceIds=instance_id)
     for instance in instances:
         return(instance.state.get("Code"))
 
+# get DNS from instance
 def getinstancesDNS():
     instances = ec2.instances.filter(InstanceIds=instance_id)
     for instance in instances:
@@ -196,6 +222,7 @@ def getinstancesDNS():
 
 #==================================SCP==================================
 
+# SCP - upload
 def putSCP(server, lPath, rPath):
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -205,6 +232,7 @@ def putSCP(server, lPath, rPath):
     sftp.close()
     ssh.close()
 
+# SCP - download
 def getSCP(server, lPath, rPath):
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -216,6 +244,7 @@ def getSCP(server, lPath, rPath):
 
 #==================================SSH==================================
 
+# start SSH connection
 def makeSSH(server, command):
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -226,13 +255,11 @@ def makeSSH(server, command):
     ssh.close()
 
 
-
-
-
 #-------------------------------------------------------------------------------
 #                              PRINT-INFOS
 #-------------------------------------------------------------------------------
 
+# Print CMD header
 def header():
 
         print("  _____ _                 _  _____ _ _           ")
@@ -248,7 +275,6 @@ def header():
 #                              START
 #-------------------------------------------------------------------------------
 
-
-
+# start point
 if __name__ == '__main__':
    main()
