@@ -10,13 +10,14 @@
                 STARTING GUIDE
 ##################################################
 
-1. init EC2 instance
+1. init EC2 instance (Linux)
 2. install slic3r
     > sudo apt-get install slic3r
 3. configurate the script (CONFIG section)
-    > instance_id = Instnce ID
+    > instance_id = Instance ID
     > cUser = Username
     > cKey = Private Key
+    (optional)
     > u_rPath = AWS upload location (STL)
     > d_rPath = AWS download location (GCODE)
 
@@ -141,7 +142,7 @@ def main():
 
     # Get instance DNS
     server = getinstancesDNS()
-    logging.info(server)
+    logging.info("Server Adress: " + server)
 
     if( getinstancesstate() == 16 ):
         # SCP upload:
@@ -177,7 +178,7 @@ def startwizard():
     global d_lPath
 
     logging.info("Starting WIZARD!")
-    print(">>> File parameters (false=default)")
+    print(">>> File parameters")
 
     while(True):
         u_lPath   = input("   Path input file (path/filename.stl): ")
@@ -188,7 +189,7 @@ def startwizard():
 
     d_lPath = input("   Path output file (path/filename.gcode): ")
 
-    print("\n>>> Print parameters")
+    print("\n>>> Print parameters (false=default)")
     for key, item in cmddict.items():
         value = input("   " + key + ": ")
         if(value.lower() in "true"):
