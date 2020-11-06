@@ -270,7 +270,7 @@ def makeSSH(server, command):
     ssh.connect(server, username=cUser, key_filename=cKey )
     stdin, stdout, stderr = ssh.exec_command(command)
     lines = stdout.readlines()
-    logging.debug(str(lines))
+    logging.info(str(lines))
     ssh.close()
 
 
